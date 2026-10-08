@@ -1,0 +1,47 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.myradostudio/keycrm",
+  "title": "KeyCRM (unofficial)",
+  "description": "Unofficial server for KeyCRM: read orders, buyers and pipelines; create lead cards on opt-in.",
+  "repository": {
+    "url": "https://github.com/myradostudio/keycrm-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://myradostudio.com/en/mcp-server-development/",
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@myradostudio/keycrm-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "KEYCRM_API_KEY",
+          "description": "API key of the KeyCRM account.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "KEYCRM_API_URL",
+          "description": "Origin of the KeyCRM API. Change it only if KeyCRM gave you a different host.",
+          "isRequired": false,
+          "isSecret": false,
+          "default": "https://openapi.keycrm.app"
+        },
+        {
+          "name": "KEYCRM_ALLOW_WRITE",
+          "description": "Set to true to register the write tool (create a lead card in a pipeline). Off by default.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "boolean",
+          "default": "false"
+        }
+      ]
+    }
+  ]
+}
