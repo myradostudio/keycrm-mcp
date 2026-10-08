@@ -58,13 +58,27 @@ export const ORDER_INCLUDES = [
 export const BUYER_INCLUDES = ['manager', 'shipping', 'company', 'loyalty', 'custom_fields'] as const;
 export const CARD_INCLUDES = ['contact.client', 'products', 'manager', 'status', 'payments', 'custom_fields'] as const;
 
+/**
+ * The list tools return summaries, so they offer only the associations a summary shows: asking for one that would be
+ * dropped spends one of the 20 requests of the minute and looks like "there is nothing". The get_* tools return the
+ * record as it is and offer everything the document allows.
+ */
+export const ORDER_LIST_INCLUDES = ['buyer', 'status', 'manager', 'products.offer', 'payments', 'shipping.deliveryService', 'tags'] as const;
+export const BUYER_LIST_INCLUDES = ['company', 'manager'] as const;
+export const CARD_LIST_INCLUDES = ['contact.client', 'status', 'manager'] as const;
+
 const PAYMENT_STATUSES = ['not_paid', 'part_paid', 'paid', 'overpaid'] as const;
 
-const orderInclude = include(
-  ORDER_INCLUDES,
-  'Useful ones: "buyer" (name and contacts), "status" (status name), "products.offer" (order lines), "payments", "shipping.deliveryService" (delivery and tracking code).',
-);
+const ORDER_HINT =
+  '"buyer" adds the name and contacts, "status" the status name, "products.offer" the order lines, "payments" the payments, "shipping.deliveryService" the delivery with its tracking code.';
+const orderListInclude = include(ORDER_LIST_INCLUDES, `${ORDER_HINT} UTM marks, expenses and custom fields come with get_order.`);
+const orderInclude = include(ORDER_INCLUDES, ORDER_HINT);
+const buyerListInclude = include(BUYER_LIST_INCLUDES, 'Delivery addresses, loyalty programmes and custom fields come with get_buyer.');
 const buyerInclude = include(BUYER_INCLUDES, '"shipping" adds delivery addresses, "company" and "manager" add the linked records.');
+const cardListInclude = include(
+  CARD_LIST_INCLUDES,
+  '"contact.client" adds the contact person, "status" the stage name, "manager" the responsible user. Products, payments and custom fields come with get_pipeline_card.',
+);
 const cardInclude = include(
   CARD_INCLUDES,
   '"contact.client" adds the contact person with the linked buyer, "status" the stage name, "manager" the responsible user.',
@@ -79,15 +93,16 @@ function sortValue(value: 'newest' | 'oldest' | undefined): string | undefined {
   return value === undefined ? undefined : value === 'newest' ? '-id' : 'id';
 }
 
-/** `GET /pipelines/cards/{cardId}` is documented as a paginated list; a bare object is accepted as well. */
-function singleRecord(response: unknown, what: string): Record<string, unknown> {
-  if (isObject(response) && Array.isArray(response['data'])) {
-    const [first] = objects(response['data']);
-    if (first === undefined) throw new ToolError(`KeyCRM returned no ${what} for this id.`);
-    return first;
-  }
-  if (!isObject(response)) throw new ToolError(`Unexpected response from the KeyCRM API: a ${what} was expected.`);
-  return response;
+/**
+ * `GET /pipelines/cards/{cardId}` is documented as a paginated list; a bare object is accepted as well. Either way the
+ * record must carry the id that was asked for: another card must never be presented as the requested one.
+ */
+function cardById(response: unknown, cardId: number): Record<string, unknown> {
+  const candidates = isObject(response) && Array.isArray(response['data']) ? objects(response['data']) : isObject(response) ? [response] : undefined;
+  if (candidates === undefined) throw new ToolError('Unexpected response from the KeyCRM API: a pipeline card was expected.');
+  const card = candidates.find((candidate) => candidate['id'] === cardId);
+  if (card === undefined) throw new ToolError(`KeyCRM returned no pipeline card with id ${cardId}.`);
+  return card;
 }
 
 export const readTools: readonly AnyTool[] = [
@@ -111,7 +126,7 @@ export const readTools: readonly AnyTool[] = [
       updated_to: dateTime('Only orders changed up to this moment (requires updated_from).').optional(),
       shipping_from: dateTime('Only orders with a shipping date from this moment (requires shipping_to).').optional(),
       shipping_to: dateTime('Only orders with a shipping date up to this moment (requires shipping_from).').optional(),
-      include: orderInclude,
+      include: orderListInclude,
       sort,
       limit,
       page,
@@ -191,7 +206,7 @@ export const readTools: readonly AnyTool[] = [
     name: 'list_buyers',
     title: 'List buyers',
     description:
-      'Lists buyers (customers) with name, phones, e-mails, birthday, note and dates (UTC). Filters: buyer ids, phone, e-mail, and periods of creation and update. Search by phone or e-mail to find out whether a person is already in the CRM. The linked company and manager are returned only when asked for with `include`. Use get_buyer for the complete record.',
+      'Lists buyers (customers) with name, phones, e-mails, birthday, note and dates (UTC). Filters: buyer ids, phone, e-mail, and periods of creation and update. Search by phone or e-mail to find out whether a person is already in the CRM. The result is personal data of customers. The linked company and manager are returned only when asked for with `include`. Use get_buyer for the complete record, including delivery addresses.',
     access: 'read',
     inputSchema: z.strictObject({
       buyer_ids: idList('Only these buyers'),
@@ -201,7 +216,7 @@ export const readTools: readonly AnyTool[] = [
       created_to: dateTime('Only buyers created up to this moment (requires created_from).').optional(),
       updated_from: dateTime('Only buyers changed from this moment (requires updated_to).').optional(),
       updated_to: dateTime('Only buyers changed up to this moment (requires updated_from).').optional(),
-      include: buyerInclude,
+      include: buyerListInclude,
       limit,
       page,
     }),
@@ -292,7 +307,7 @@ export const readTools: readonly AnyTool[] = [
       created_to: dateTime('Only cards created up to this moment (requires created_from).').optional(),
       updated_from: dateTime('Only cards changed from this moment (requires updated_to).').optional(),
       updated_to: dateTime('Only cards changed up to this moment (requires updated_from).').optional(),
-      include: cardInclude,
+      include: cardListInclude,
       limit,
       page,
     }),
@@ -329,7 +344,7 @@ export const readTools: readonly AnyTool[] = [
         pathParams: { cardId: args.card_id },
         query: { include: joined(args.include) },
       });
-      return { data: singleRecord(response, 'pipeline card') };
+      return { data: cardById(response, args.card_id) };
     },
   }),
 
@@ -337,7 +352,7 @@ export const readTools: readonly AnyTool[] = [
     name: 'list_users',
     title: 'List users (managers)',
     description:
-      'Lists the users of the KeyCRM account, i.e. managers: id, full name, login, e-mail, role id and status (active or blocked). Use the id as manager_id of a new pipeline card and to read manager_id in orders and cards.',
+      'Lists the users of the KeyCRM account, i.e. managers: id, full name, login, e-mail, role id and status (active, pending or blocked). Use the id as manager_id of a new pipeline card and to read manager_id in orders and cards.',
     access: 'read',
     inputSchema: z.strictObject({ limit, page }),
     annotations: READ_ONLY,

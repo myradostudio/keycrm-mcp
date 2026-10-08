@@ -53,6 +53,15 @@ describe('loadConfig', () => {
     assert.ok(!problems.join('\n').includes(KEY));
   });
 
+  it('rejects a key with characters a header cannot carry, picked up when copying from a document', () => {
+    for (const value of [`\u201c${KEY}\u201d`, `${KEY}\u200b`, 'ключ']) {
+      const problems = problemsOf({ KEYCRM_API_KEY: value });
+      assert.equal(problems.length, 1, JSON.stringify(value));
+      assert.match(problems[0] ?? '', /Copy the key again/);
+      assert.ok(!problems.join('\n').includes(KEY), 'a problem never repeats the key');
+    }
+  });
+
   it('enables the write tool only for explicit true values', () => {
     for (const value of ['1', 'true', 'TRUE', 'yes', 'on']) {
       assert.equal(loadConfig({ KEYCRM_API_KEY: KEY, KEYCRM_ALLOW_WRITE: value }).allowWrite, true, value);

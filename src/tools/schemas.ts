@@ -17,13 +17,24 @@ export const idList = (what: string) => z.array(z.number().int().min(1)).min(1).
  * A short pattern instead of `z.iso.datetime()`: the latter puts a 400-character
  * regular expression into the JSON Schema of every date argument of every tool.
  */
-const DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+const DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * Date.parse alone is not enough: it turns 31 April into 1 May, and a moment at the edge of year 9999 moves into a
+ * five-digit year in UTC. Either would quietly ask KeyCRM about another period than the one that was meant.
+ */
+function isRealMoment(value: string): boolean {
+  const day = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(day.getTime()) || !day.toISOString().startsWith(value.slice(0, 10))) return false;
+  const moment = new Date(value);
+  return !Number.isNaN(moment.getTime()) && /^\d{4}-/.test(moment.toISOString());
+}
 
 export const dateTime = (what: string) =>
   z
     .string()
     .regex(DATE_TIME_PATTERN, 'Must be an ISO 8601 date-time with a UTC offset, e.g. 2026-10-01T00:00:00+03:00.')
-    .refine((value) => !Number.isNaN(Date.parse(value)), 'Not a valid date-time.')
+    .refine(isRealMoment, 'Not a valid date-time.')
     .describe(
       `${what} ISO 8601 with a UTC offset, e.g. 2026-10-01T00:00:00+03:00 (Kyiv is +02:00 in winter, +03:00 in summer). The server converts it to UTC, which is what KeyCRM works in.`,
     );

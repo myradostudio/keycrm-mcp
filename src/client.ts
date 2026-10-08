@@ -35,7 +35,7 @@ export interface KeycrmClientOptions {
   readonly config: Config;
   /** Injectable for tests; defaults to the global `fetch`. */
   readonly fetch?: FetchLike;
-  /** Injectable clock for tests; defaults to `Date.now`. */
+  /** Injectable clock for tests; defaults to the monotonic `performance.now`. */
   readonly now?: () => number;
   /** Injectable delay for tests; defaults to a timer. */
   readonly sleep?: (ms: number) => Promise<void>;
@@ -59,7 +59,8 @@ export class KeycrmClient {
     this.config = options.config;
     this.fetchImpl = options.fetch ?? ((url, init) => fetch(url, init));
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
-    this.limiter = new RateLimiter(RATE_WINDOWS, options.now ?? Date.now);
+    // A monotonic clock: a step of the wall clock backwards would look like a burst of requests in the future.
+    this.limiter = new RateLimiter(RATE_WINDOWS, options.now ?? (() => performance.now()));
   }
 
   /** Calls an API operation and returns the parsed JSON body, or null for an empty one. */
@@ -100,7 +101,8 @@ export class KeycrmClient {
   private async parse<T>(endpoint: Endpoint, response: Response): Promise<T> {
     let text: string;
     try {
-      text = await response.text();
+      // Scrubbed once, here: whatever is built from the answer below (data, messages, details) cannot carry the key.
+      text = this.scrub(await response.text());
     } catch (error) {
       // The headers arrived but the body did not: the timeout or the connection cut it off.
       throw this.toTransportError(endpoint, error);
@@ -144,17 +146,17 @@ export class KeycrmClient {
    * since that is where a validation error would name the offending field.
    */
   private toApiError(status: number, statusText: string, text: string): KeycrmApiError {
-    // Scrub before truncating: a secret cut in half by the limit would no longer be recognised.
-    let message = this.scrub(text.trim()).slice(0, MAX_ERROR_BODY_CHARS) || statusText || 'Empty error response.';
+    // `text` is already scrubbed (see parse): truncating cannot leave half a key behind.
+    let message = text.trim().slice(0, MAX_ERROR_BODY_CHARS) || statusText || 'Empty error response.';
     let details: string[] = [];
 
     try {
       const parsed: unknown = JSON.parse(text);
       if (isObject(parsed)) {
-        details = fieldErrors(parsed['errors']).map((line) => this.scrub(line));
+        details = fieldErrors(parsed['errors']);
         const apiMessage = parsed['message'];
         if (typeof apiMessage === 'string' && apiMessage !== '') {
-          message = this.scrub(apiMessage).slice(0, MAX_ERROR_BODY_CHARS);
+          message = apiMessage.slice(0, MAX_ERROR_BODY_CHARS);
         } else if (details.length > 0) {
           message = 'The request was refused.';
         }

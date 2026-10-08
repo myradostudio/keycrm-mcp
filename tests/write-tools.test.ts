@@ -8,7 +8,8 @@ import { afterEach, describe, it } from 'node:test';
 
 import { KeycrmClient } from '../src/client.js';
 import { runTool } from '../src/server.js';
-import { writeTools } from '../src/tools/write.js';
+import { readTools } from '../src/tools/read.js';
+import { recoveryArguments, writeTools } from '../src/tools/write.js';
 import { hang, json } from './support/fake-api.js';
 import * as fixtures from './support/fixtures.js';
 import { IDS } from './support/fixtures.js';
@@ -151,10 +152,44 @@ describe('create_pipeline_card', () => {
 
       assert.equal(result.isError, true);
       assert.match(result.text, /It is unknown whether KeyCRM created the record\. Do not simply repeat the call\./);
-      assert.match(result.text, /Call list_pipeline_cards with sort "newest"/);
+      assert.match(result.text, /Call list_pipeline_cards with \{"created_from":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"/);
+      assert.match(result.text, /Create the card again only if none of them has this contact\./);
+      assert.doesNotMatch(result.text, /Wait before retrying/, 'no advice to retry next to "do not repeat the call"');
       assert.equal(harness.api.requests.length, 1, 'the server never retries a card');
     });
   }
+
+  it('gives advice the model can follow: the arguments it names are accepted by list_pipeline_cards', async () => {
+    harness = await createHarness({ allowWrite: true });
+    harness.api.on('POST', CARDS, json({ message: 'Bad gateway' }, 502));
+    const listCards = readTools.find((tool) => tool.name === 'list_pipeline_cards');
+    assert.ok(listCards);
+
+    const result = await harness.call('create_pipeline_card', LEAD);
+
+    // The advice quotes the arguments as JSON; take them out of the text and give them to the tool it names.
+    const quoted = /Call list_pipeline_cards with (\{.*?\}) and follow next_page/.exec(result.text)?.[1];
+    assert.ok(quoted, result.text);
+    const advised = JSON.parse(quoted) as Record<string, unknown>;
+    assert.equal(listCards.inputSchema.safeParse(advised).success, true, quoted);
+
+    harness.api.on('GET', CARDS, json({ total: 0, data: [], next_page_url: null }));
+    const followed = await harness.call('list_pipeline_cards', advised);
+    assert.equal(followed.isError, false, followed.text);
+    const sent = harness.api.requests.at(-1);
+    assert.match(sent?.url.searchParams.get('filter[created_between]') ?? '', /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    assert.equal(sent?.url.searchParams.get('include'), 'contact.client');
+    assert.equal(sent?.url.searchParams.get('limit'), '50');
+  });
+
+  it('builds the check for a window of five minutes each way around the attempt', () => {
+    assert.deepEqual(recoveryArguments(new Date('2026-10-08T07:00:30.500Z')), {
+      created_from: '2026-10-08T06:55:30Z',
+      created_to: '2026-10-08T07:05:30Z',
+      include: ['contact.client'],
+      limit: 50,
+    });
+  });
 
   it('says the outcome is unknown after a timeout', async () => {
     const config = testConfig({ allowWrite: true, timeoutMs: 30 });
@@ -176,6 +211,8 @@ describe('create_pipeline_card', () => {
 
     assert.equal(result.isError, false);
     assert.match(result.text, /answered with success but without a card id/);
+    assert.match(result.text, /Call list_pipeline_cards with \{"created_from"/);
+    assert.match(result.text, /Do not create it again unless none of them has this contact\./);
   });
 
   it('validates the arguments before anything is sent', async () => {
@@ -184,7 +221,12 @@ describe('create_pipeline_card', () => {
       {},
       { contact: {} },
       { contact: { full_name: '   ' } },
+      // A name alone: nobody could reach this lead.
+      { contact: { full_name: 'Ірина Тестова' } },
       { contact: { phone: 'call me' } },
+      { contact: { phone: '---------' } },
+      { contact: { phone: '(((  )))' } },
+      { contact: { phone: '12-34' } },
       { contact: { email: 'not-an-email' } },
       { contact: { buyer_id: 0 } },
       { contact: { phone: '+380501234567', telegram: '@iryna' } },
@@ -207,6 +249,6 @@ describe('create_pipeline_card', () => {
 
     const result = await harness.call('create_pipeline_card', { contact: {} });
 
-    assert.match(result.text, /at least one of full_name, phone, email or buyer_id/);
+    assert.match(result.text, /Give a phone, an e-mail or buyer_id/);
   });
 });

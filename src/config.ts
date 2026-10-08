@@ -92,6 +92,11 @@ function parseApiKey(raw: string | undefined, problems: string[], notices: strin
   }
   if (/\s/.test(key)) {
     problems.push('KEYCRM_API_KEY must be the API key alone, without spaces or line breaks.');
+  } else if (!/^[\x21-\x7e]+$/.test(key)) {
+    // A header value cannot carry anything else: every request would fail inside fetch before it is sent.
+    problems.push(
+      'KEYCRM_API_KEY contains a character that is not a plain Latin letter, digit or sign (a curly quote or an invisible space, often picked up when copying from a document). Copy the key again.',
+    );
   }
   return key;
 }

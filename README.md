@@ -110,7 +110,7 @@ All paths are relative to `https://openapi.keycrm.app/v1`.
 
 List tools return compact summaries and a `pagination` block. The page size defaults to 15, the default of the API, and is capped at 50, its maximum; `next_page` tells the model how to continue.
 
-Related data is returned only when asked for with `include`, exactly as in the API: for example `["buyer", "status", "products.offer"]` for orders, or `["contact.client", "status"]` for pipeline cards. The tools offer the values the document lists as allowed, and a test keeps the two lists equal.
+Related data is returned only when asked for with `include`, exactly as in the API: for example `["buyer", "status", "products.offer"]` for orders, or `["contact.client", "status"]` for pipeline cards. The `get_*` tools offer every value the document lists as allowed, and a test keeps the two lists equal. The list tools offer only the values their summaries show, so a request is never spent on data that would be dropped: delivery addresses come with `get_buyer`, UTM marks and custom fields with `get_order` and `get_pipeline_card`.
 
 ### Write tool (only with `KEYCRM_ALLOW_WRITE=1`)
 
@@ -127,11 +127,11 @@ A CRM holds your customers' personal data and your managers act on what appears 
 - **Read-only unless you opt in.** Without `KEYCRM_ALLOW_WRITE=1` the write tool is not registered at all: the model cannot see or call it. Every read tool issues only `GET` requests, and a test enforces that.
 - **Nothing existing can be changed.** There is no tool that updates or deletes an order, a buyer or a card.
 - **Honest annotations.** Read tools carry `readOnlyHint: true`. `create_pipeline_card` adds a record and is marked as a non-destructive, non-idempotent write. Whether and how confirmation is shown is up to your MCP client; keep per-call approval switched on for the write tool.
-- **Strict input.** Every tool rejects arguments it does not know, so a filter the API does not have is never silently ignored. A period needs both ends. A contact needs at least a name, a phone, an e-mail or a buyer id.
+- **Strict input.** Every tool rejects arguments it does not know, so a filter the API does not have is never silently ignored. A period needs both ends, and a date that does not exist (31 April) is refused instead of rolling over into the next month. A contact needs a phone, an e-mail or a buyer id; a name alone is not enough.
 - **No blind retries.** The server never repeats a request on its own. If creating a card ends without a definite answer (a timeout, a broken connection, a gateway error, HTTP 429, an unreadable response), the tool says that the outcome is unknown and how to check it. KeyCRM documents no way to make this request safe to repeat, so a blind retry could create the same lead twice.
 - **Stays within the documented rate.** KeyCRM allows 20 requests per minute for one API key. The server counts its own requests: when the limit is reached it waits up to five seconds for a free moment, and beyond that the tool reports when to try again instead of sending.
-- **The key stays local.** It is read from an environment variable, used only for requests to `KEYCRM_API_URL`, and never written to stdout, stderr or tool results. Redirects are not followed, so neither the key nor a request body can end up on another host.
-- **Less data to the model.** List tools return summaries, and customer contacts appear in them only when the model asks for them with `include`. `get_order`, `get_buyer` and `get_pipeline_card` return full records.
+- **The key stays local.** It is read from an environment variable, used only for requests to `KEYCRM_API_URL`, and never written to stdout or stderr. Every answer of the API is cleaned of the key before anything is built from it, so it cannot reach a tool result either. Redirects are not followed, so neither the key nor a request body can end up on another host.
+- **Less data to the model.** List tools return summaries. An order or a card shows its buyer or contact person only when the model asks for it with `include`; `list_buyers` is a list of customers and returns their names, phones and e-mail addresses by nature. `get_order`, `get_buyer` and `get_pipeline_card` return full records.
 - **No telemetry, no logging of business data.** stderr gets only startup messages (configuration problems and a one-line banner with the mode) and the type of a transport error. Requests and responses are never logged.
 
 Two things the server cannot do for you. First, whatever a tool returns is sent to the AI model you use and to its provider; orders and buyers are personal data, so decide whether that is acceptable and lawful for your customers. Second, comments, names and titles stored in KeyCRM reach the model as-is and could contain instructions written by someone else (prompt injection); a buyer's comment is typed by your customer. That is one more reason to approve every write call yourself.
@@ -144,7 +144,7 @@ Two things the server cannot do for you. First, whatever a tool returns is sent 
 - **The key is the whole account.** The document describes no scopes for an API key.
 - **Not covered:** creating or changing orders and buyers, moving a card to another stage, payments and expenses, products, stock, companies, tags, files, calls, custom field definitions, webhooks.
 - **`create_pipeline_card` does not send products or payments**, although the API accepts them.
-- **`get_pipeline_card`.** The document describes the answer for a single card as a paginated list. The server returns the first record of that list, and also accepts a bare object.
+- **`get_pipeline_card`.** The document describes the answer for a single card as a paginated list. The server returns the record of that list whose id is the one asked for, accepts a bare object as well, and reports an error rather than present another card as the requested one.
 - **Error details.** The document shows only `{"message": "…"}` for an error. If KeyCRM sends a map of field errors under `errors`, the server lists it; that part is a guess about an undocumented format and is shown only when present.
 - **Pacing is per server process.** KeyCRM counts requests per API key. Other programs that use the same key spend the same allowance, so the API can still refuse a request.
 - **One account per server instance.**
@@ -160,7 +160,7 @@ npm run spec:update   # refreshes the OpenAPI snapshot from docs.keycrm.app
 ```
 
 - `src/endpoints.ts` is the catalogue of API operations the server calls. `tests/spec.test.ts` compares it with `spec/keycrm-api.snapshot.json`, a reduced copy of the official OpenAPI document (parameters, request schemas, filter names and allowed `include` values of those operations only).
-- Every tool test calls the tool through a real MCP client and passes each recorded request through `assertMatchesSpec`, which checks the path, query parameters, filters, headers and body against that snapshot.
+- Every tool test calls the tool through a real MCP client. When a test ends, each request it recorded goes through `assertMatchesSpec`, which checks the path, query parameters, filters, headers and body against that snapshot.
 - `tests/e2e.test.ts` starts the built server as a child process over stdio against a local HTTP mock.
 - To poke at the server by hand: `npx @modelcontextprotocol/inspector node dist/index.js`.
 

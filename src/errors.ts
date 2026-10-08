@@ -71,11 +71,15 @@ const STATUS_HINTS: Readonly<Record<number, string>> = {
   429: 'Rate limit reached: KeyCRM allows 20 requests per minute for one API key. Wait before retrying.',
 };
 
-export function describeError(error: unknown): string {
+/**
+ * @param hints false leaves out the advice for the status. A write whose outcome is unknown adds its own advice,
+ *   and "wait before retrying" next to "do not repeat the call" would contradict it.
+ */
+export function describeError(error: unknown, { hints = true }: { hints?: boolean } = {}): string {
   if (error instanceof KeycrmApiError) {
     const lines = [`KeyCRM API error (HTTP ${error.status}): ${error.message}`];
     for (const detail of error.details) lines.push(`  - ${detail}`);
-    const hint = STATUS_HINTS[error.status];
+    const hint = hints ? STATUS_HINTS[error.status] : undefined;
     if (hint !== undefined) lines.push(hint);
     return lines.join('\n');
   }

@@ -113,7 +113,8 @@ describe('annotations', () => {
       get_order: { order_id: IDS.order },
       get_buyer: { buyer_id: IDS.buyer },
       list_pipeline_statuses: { pipeline_id: IDS.pipeline },
-      get_pipeline_card: { card_id: IDS.card },
+      // The stand-in answers every GET with a list holding a record with id 1.
+      get_pipeline_card: { card_id: 1 },
     };
 
     for (const tool of selectTools(testConfig())) {

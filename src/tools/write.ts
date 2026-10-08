@@ -43,7 +43,7 @@ async function submit(client: KeycrmClient, endpoint: Endpoint, options: Request
   } catch (error) {
     if (isDefiniteRefusal(error)) throw error;
     throw new ToolError(
-      `${describeError(error)}
+      `${describeError(error, { hints: false })}
 It is unknown whether KeyCRM created the record. Do not simply repeat the call. ${recovery}`,
     );
   }
@@ -65,16 +65,30 @@ const contact = z
       .string()
       .trim()
       .regex(/^\+?[\d\s()-]{7,25}$/, 'Must be a phone number: digits, spaces, brackets and dashes, optionally with a leading +.')
+      // Counted without the separators: a row of dashes is not a phone.
+      .refine((value) => value.replace(/\D/g, '').length >= 7, 'Must hold at least 7 digits.')
       .optional()
       .describe('Phone. KeyCRM recommends the international format with a plus, e.g. +380501234567.'),
     email: z.email().optional().describe('E-mail of the person.'),
     buyer_id: id('Id of an existing buyer (client_id in KeyCRM). The card is then created for that buyer and KeyCRM ignores the other contact fields')
       .optional(),
   })
-  .refine((value) => Object.values(value).some((item) => item !== undefined), {
-    message: 'Give at least one of full_name, phone, email or buyer_id: a lead nobody can reach is of no use.',
+  .refine((value) => value.phone !== undefined || value.email !== undefined || value.buyer_id !== undefined, {
+    message: 'Give a phone, an e-mail or buyer_id: a lead nobody can reach is of no use. A name alone is not enough.',
   })
-  .describe('Who the lead is: a name with a phone or an e-mail, or the id of an existing buyer.');
+  .describe('Who the lead is: a phone or an e-mail, preferably with a name, or the id of an existing buyer.');
+
+/** The arguments for list_pipeline_cards that show what was created around a moment; put into the advice as they are. */
+export function recoveryArguments(at: Date): { created_from: string; created_to: string; include: string[]; limit: number } {
+  const iso = (ms: number) => `${new Date(ms).toISOString().slice(0, 19)}Z`;
+  return {
+    // A few minutes each way: the clocks of this machine and of KeyCRM need not agree to the second.
+    created_from: iso(at.getTime() - 5 * 60_000),
+    created_to: iso(at.getTime() + 5 * 60_000),
+    include: ['contact.client'],
+    limit: 50,
+  };
+}
 
 const customField = z.strictObject({
   uuid: text(100, 'External id of the custom field, as shown in the KeyCRM settings, e.g. LD_1021.'),
@@ -86,7 +100,7 @@ export const writeTools: readonly AnyTool[] = [
     name: 'create_pipeline_card',
     title: 'Create a pipeline card (lead)',
     description:
-      'Creates a new card in a pipeline, i.e. registers a lead that managers will see and work on. Without pipeline_id KeyCRM uses the first pipeline of the list. Give the contact as a name with a phone or an e-mail, or as the id of an existing buyer (find one with list_buyers by phone or e-mail first, so that the lead is attached to the right person). The call is not idempotent: repeating it creates a second card. State who the lead is and what the card will say, and get explicit confirmation from the user before calling. Not covered by this tool: products and payments of a card.',
+      'Creates a new card in a pipeline, i.e. registers a lead that managers will see and work on. Without pipeline_id KeyCRM uses the first pipeline of the list. Give the contact as a phone or an e-mail, preferably with a name, or as the id of an existing buyer (find one with list_buyers by phone or e-mail first, so that the lead is attached to the right person). The call is not idempotent: repeating it creates a second card. State who the lead is and what the card will say, and get explicit confirmation from the user before calling. Not covered by this tool: products and payments of a card.',
     access: 'write',
     inputSchema: z.strictObject({
       contact,
@@ -126,16 +140,17 @@ export const writeTools: readonly AnyTool[] = [
         custom_fields: args.custom_fields,
       });
 
+      const check = `Call list_pipeline_cards with ${JSON.stringify(recoveryArguments(new Date()))} and follow next_page to the end: these are the cards created around this attempt.`;
       const response = await submit(
         client,
         ENDPOINTS.createPipelineCard,
         { body },
-        'Call list_pipeline_cards with sort "newest" and include ["contact.client"] and look for a card with this contact created in the last minutes. Create the card again only if there is none.',
+        `${check} Create the card again only if none of them has this contact.`,
       );
 
       if (!isObject(response) || typeof response['id'] !== 'number') {
         return {
-          note: 'KeyCRM answered with success but without a card id. The card was most likely created; check with list_pipeline_cards (sort "newest") before trying again.',
+          note: `KeyCRM answered with success but without a card id. The card was most likely created. ${check} Do not create it again unless none of them has this contact.`,
           data: response,
         };
       }

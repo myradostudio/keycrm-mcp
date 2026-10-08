@@ -7,7 +7,14 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { API_BASE_PATH, ENDPOINTS, type Endpoint } from '../src/endpoints.js';
-import { BUYER_INCLUDES, CARD_INCLUDES, ORDER_INCLUDES } from '../src/tools/read.js';
+import {
+  BUYER_INCLUDES,
+  BUYER_LIST_INCLUDES,
+  CARD_INCLUDES,
+  CARD_LIST_INCLUDES,
+  ORDER_INCLUDES,
+  ORDER_LIST_INCLUDES,
+} from '../src/tools/read.js';
 import { snapshot, validate } from './support/spec.js';
 
 const entries = Object.entries(ENDPOINTS) as [string, Endpoint][];
@@ -57,16 +64,29 @@ describe('include values vs. the allowed associations of the document', () => {
   ];
 
   for (const [name, values, keys] of cases) {
-    it(`${name}: the tools offer exactly what the document allows`, () => {
+    it(`${name}: the get tool offers exactly what the document allows`, () => {
       for (const key of keys) {
         assert.deepEqual([...values].sort(), [...(operation(key).includeValues ?? [])].sort(), key);
       }
     });
   }
+
+  it('the list tools offer a part of it: only what their summaries show', () => {
+    const subsets: [readonly string[], readonly string[], string][] = [
+      [ORDER_LIST_INCLUDES, ORDER_INCLUDES, 'GET /order'],
+      [BUYER_LIST_INCLUDES, BUYER_INCLUDES, 'GET /buyer'],
+      [CARD_LIST_INCLUDES, CARD_INCLUDES, 'GET /pipelines/cards'],
+    ];
+    for (const [list, full, key] of subsets) {
+      assert.ok(list.length > 0 && list.length < full.length, key);
+      for (const value of list) assert.ok((operation(key).includeValues ?? []).includes(value), `${key}: ${value}`);
+    }
+  });
 });
 
 describe('filters shown by the document', () => {
-  it('are the ones the list tools use', () => {
+  // The tools are held to these names by assertMatchesSpec; this test notices when the document drops or adds one.
+  it('are still the ones the list tools were written for', () => {
     assert.deepEqual(operation('GET /order').filterNames, [
       'buyer_email',
       'buyer_phone',

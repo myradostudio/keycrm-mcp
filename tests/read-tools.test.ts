@@ -188,6 +188,13 @@ describe('list_orders', () => {
       { include: ['customer'] },
       { payment_statuses: ['refunded'] },
       { created_from: '2026-10-01', created_to: '2026-10-07' },
+      // Moments that do not exist would roll over to another day, and so to another period.
+      { created_from: '2026-04-31T00:00:00+03:00', created_to: '2026-05-02T00:00:00+03:00' },
+      { created_from: '2026-10-01T24:00:00+03:00', created_to: '2026-10-02T00:00:00+03:00' },
+      { created_from: '2026-10-01T00:00:00+03:00', created_to: '9999-12-31T23:59:59-05:00' },
+      // Offered by get_order only: a list summary would drop them without a word.
+      { include: ['marketing'] },
+      { include: ['custom_fields'] },
       { buyer_phone: '+380501234567,+380671234567' },
       { status_ids: [] },
       { limit: 0 },
@@ -346,6 +353,16 @@ describe('buyers', () => {
     assert.equal(result.isError, true);
     assert.equal(harness.api.requests.length, 0);
   });
+
+  it('list_buyers does not take an include its summary would drop', async () => {
+    harness = await createHarness();
+
+    for (const include of [['shipping'], ['loyalty'], ['custom_fields']]) {
+      const result = await harness.call('list_buyers', { include });
+      assert.equal(result.isError, true, include.join());
+    }
+    assert.equal(harness.api.requests.length, 0, 'no request of the minute is spent on data that would not be shown');
+  });
 });
 
 describe('pipelines', () => {
@@ -448,7 +465,37 @@ describe('pipelines', () => {
     const result = await harness.call('get_pipeline_card', { card_id: IDS.card });
 
     assert.equal(result.isError, true);
-    assert.equal(result.text, 'KeyCRM returned no pipeline card for this id.');
+    assert.equal(result.text, 'KeyCRM returned no pipeline card with id 880.');
+  });
+
+  it('get_pipeline_card never presents another card as the one that was asked for', async () => {
+    harness = await createHarness();
+    harness.api.on('GET', `/v1/pipelines/cards/${IDS.card}`, page([{ ...fixtures.card, id: 881 }, { ...fixtures.card, id: 882 }]));
+
+    const fromList = await harness.call('get_pipeline_card', { card_id: IDS.card });
+    harness.api.on('GET', `/v1/pipelines/cards/${IDS.card}`, json({ ...fixtures.card, id: 881 }));
+    const fromObject = await harness.call('get_pipeline_card', { card_id: IDS.card });
+
+    for (const result of [fromList, fromObject]) {
+      assert.equal(result.isError, true);
+      assert.equal(result.text, 'KeyCRM returned no pipeline card with id 880.');
+    }
+  });
+
+  it('get_pipeline_card picks the requested card out of a longer list', async () => {
+    harness = await createHarness();
+    harness.api.on('GET', `/v1/pipelines/cards/${IDS.card}`, page([{ ...fixtures.card, id: 881 }, fixtures.card]));
+
+    assert.deepEqual(await harness.callJson('get_pipeline_card', { card_id: IDS.card }), fixtures.card);
+  });
+
+  it('list_pipeline_cards does not take an include its summary would drop', async () => {
+    harness = await createHarness();
+
+    for (const include of [['products'], ['payments'], ['custom_fields']]) {
+      assert.equal((await harness.call('list_pipeline_cards', { include })).isError, true, include.join());
+    }
+    assert.equal(harness.api.requests.length, 0);
   });
 });
 

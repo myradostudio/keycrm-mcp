@@ -146,6 +146,20 @@ describe('failures', () => {
     assert.match(text, /key: Bearer \[redacted\]/);
   });
 
+  it('cleans the whole answer of the key before anything is cut or parsed', async () => {
+    const { api, client } = setup();
+    // The key starts inside the first 500 characters of the field error and ends after them.
+    api.on('POST', /.*/, json({ message: 'Invalid', errors: { title: [`${'x'.repeat(490)}${API_KEY} tail`] } }, 422));
+    api.on('GET', /.*/, json({ id: 1, manager_comment: `echo ${API_KEY}` }));
+
+    const error = await client.request(ENDPOINTS.createPipelineCard, { body: {} }).catch((e: unknown) => e);
+    const data = await client.request(ENDPOINTS.order, { pathParams: { orderId: 1 } });
+
+    assert.ok(error instanceof KeycrmApiError);
+    assert.ok(!describeError(error).includes(API_KEY.slice(0, 8)), 'not even the beginning of the key survives the cut');
+    assert.deepEqual(data, { id: 1, manager_comment: 'echo [redacted]' });
+  });
+
   it('does not follow a redirect and says what to check', async () => {
     const { api, client } = setup();
     api.on('GET', /.*/, new Response(null, { status: 301, headers: { location: 'https://elsewhere.example/' } }));
@@ -192,6 +206,20 @@ describe('failures', () => {
     assert.ok(error instanceof KeycrmTransportError);
     assert.equal(error.kind, 'network');
     assert.match(error.message, /no usable response from https:\/\/openapi\.keycrm\.test \(ENOTFOUND\)/);
+  });
+
+  it('removes the key from the cause of a network failure', async () => {
+    const client = new KeycrmClient({
+      config: testConfig(),
+      fetch: async () => {
+        throw new TypeError('fetch failed', { cause: { message: `bad header Bearer ${API_KEY}` } });
+      },
+    });
+
+    const error = await client.request(ENDPOINTS.orders).catch((e: unknown) => e);
+
+    assert.ok(error instanceof KeycrmTransportError);
+    assert.match(error.message, /\(bad header Bearer \[redacted\]\)\.$/);
   });
 
   it('never repeats a request on its own, whatever the answer', async () => {

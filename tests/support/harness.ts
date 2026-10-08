@@ -6,6 +6,7 @@ import { KeycrmClient } from '../../src/client.js';
 import type { Config } from '../../src/config.js';
 import { createServer } from '../../src/server.js';
 import { FakeApi } from './fake-api.js';
+import { assertMatchesSpec } from './spec.js';
 
 export const API_KEY = 'test-api-key-0123456789abcdef';
 
@@ -72,6 +73,8 @@ export async function createHarness(overrides: Partial<Config> = {}, api = new F
     close: async () => {
       await mcp.close();
       await server.close();
+      // Every request of every test is held against the OpenAPI snapshot, whether or not the test looked at it.
+      for (const request of api.requests) assertMatchesSpec(request);
     },
   };
 }
