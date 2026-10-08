@@ -1,0 +1,731 @@
+{
+  "source": "https://docs.keycrm.app/api.yaml",
+  "title": "keyCRM OpenAPI documentation",
+  "version": "1.2.0",
+  "server": "https://openapi.keycrm.app/v1",
+  "operations": {
+    "GET /buyer": {
+      "security": true,
+      "parameters": [
+        {
+          "name": "Accept",
+          "in": "header",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "filter",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "name": "include",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 15,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 1,
+            "type": "integer"
+          }
+        }
+      ],
+      "successStatuses": [
+        "200"
+      ],
+      "filterNames": [
+        "buyer_email",
+        "buyer_id",
+        "buyer_phone",
+        "created_between",
+        "updated_between"
+      ],
+      "includeValues": [
+        "company",
+        "custom_fields",
+        "loyalty",
+        "manager",
+        "shipping"
+      ]
+    },
+    "GET /buyer/{buyerId}": {
+      "security": true,
+      "parameters": [
+        {
+          "name": "Accept",
+          "in": "header",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "buyerId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "name": "include",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "successStatuses": [
+        "200"
+      ],
+      "includeValues": [
+        "company",
+        "custom_fields",
+        "loyalty",
+        "manager",
+        "shipping"
+      ]
+    },
+    "GET /order": {
+      "security": true,
+      "parameters": [
+        {
+          "name": "Accept",
+          "in": "header",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "filter",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "name": "include",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 15,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 1,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "sort",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "successStatuses": [
+        "200"
+      ],
+      "filterNames": [
+        "buyer_email",
+        "buyer_phone",
+        "created_between",
+        "has_tracking_code",
+        "payment_status",
+        "shipping_between",
+        "source_id",
+        "source_uuid",
+        "status_id",
+        "updated_between"
+      ],
+      "includeValues": [
+        "assigned",
+        "buyer",
+        "custom_fields",
+        "expenses",
+        "manager",
+        "marketing",
+        "payments",
+        "products.offer",
+        "shipping.deliveryService",
+        "shipping.lastHistory",
+        "status",
+        "tags"
+      ]
+    },
+    "GET /order/{orderId}": {
+      "security": true,
+      "parameters": [
+        {
+          "name": "Accept",
+          "in": "header",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "orderId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "name": "include",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "successStatuses": [
+        "200"
+      ],
+      "includeValues": [
+        "assigned",
+        "buyer",
+        "custom_fields",
+        "expenses",
+        "manager",
+        "marketing",
+        "payments",
+        "products.offer",
+        "shipping.deliveryService",
+        "shipping.lastHistory",
+        "status",
+        "tags"
+      ]
+    },
+    "GET /order/source": {
+      "security": true,
+      "parameters": [
+        {
+          "name": "Accept",
+          "in": "header",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 15,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 1,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "sort",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "successStatuses": [
+        "200"
+      ]
+    },
+    "GET /order/status": {
+      "security": true,
+      "parameters": [
+        {
+          "name": "Accept",
+          "in": "header",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 15,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 1,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "sort",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "successStatuses": [
+        "200"
+      ]
+    },
+    "GET /pipelines": {
+      "security": true,
+      "parameters": [
+        {
+          "name": "Accept",
+          "in": "header",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 15,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 1,
+            "type": "integer"
+          }
+        }
+      ],
+      "successStatuses": [
+        "200"
+      ]
+    },
+    "GET /pipelines/{pipelineId}/statuses": {
+      "security": true,
+      "parameters": [
+        {
+          "name": "Accept",
+          "in": "header",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "pipelineId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 15,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 1,
+            "type": "integer"
+          }
+        }
+      ],
+      "successStatuses": [
+        "200"
+      ]
+    },
+    "GET /pipelines/cards": {
+      "security": true,
+      "parameters": [
+        {
+          "name": "Accept",
+          "in": "header",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "filter",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "name": "include",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 15,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 1,
+            "type": "integer"
+          }
+        }
+      ],
+      "successStatuses": [
+        "200"
+      ],
+      "filterNames": [
+        "created_between",
+        "pipeline_id",
+        "source_id",
+        "status_id",
+        "updated_between"
+      ],
+      "includeValues": [
+        "contact.client",
+        "custom_fields",
+        "manager",
+        "payments",
+        "products",
+        "status"
+      ]
+    },
+    "GET /pipelines/cards/{cardId}": {
+      "security": true,
+      "parameters": [
+        {
+          "name": "Accept",
+          "in": "header",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "cardId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "include",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "successStatuses": [
+        "200"
+      ],
+      "includeValues": [
+        "contact.client",
+        "custom_fields",
+        "manager",
+        "payments",
+        "products",
+        "status"
+      ]
+    },
+    "GET /users": {
+      "security": true,
+      "parameters": [
+        {
+          "name": "Accept",
+          "in": "header",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "filter",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 15,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "page",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "default": 1,
+            "type": "integer"
+          }
+        }
+      ],
+      "successStatuses": [
+        "200"
+      ],
+      "filterNames": [
+        "created_between",
+        "email",
+        "full_name",
+        "id",
+        "last_logged_between",
+        "phone",
+        "role_id",
+        "status"
+      ]
+    },
+    "POST /pipelines/cards": {
+      "security": true,
+      "parameters": [],
+      "successStatuses": [
+        "201"
+      ],
+      "requestBody": {
+        "required": true,
+        "schema": {
+          "properties": {
+            "communicate_at": {
+              "nullable": true,
+              "type": "string"
+            },
+            "contact": {
+              "properties": {
+                "client_id": {
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "email": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "full_name": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "phone": {
+                  "nullable": true,
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "custom_fields": {
+              "items": {
+                "properties": {
+                  "uuid": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "manager_comment": {
+              "nullable": true,
+              "type": "string"
+            },
+            "manager_id": {
+              "nullable": true,
+              "type": "integer"
+            },
+            "payments": {
+              "items": {
+                "properties": {
+                  "amount": {
+                    "type": "number"
+                  },
+                  "description": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "payment_date": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "payment_method": {
+                    "type": "string"
+                  },
+                  "payment_method_id": {
+                    "type": "integer"
+                  },
+                  "status": {
+                    "nullable": true,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "amount"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "pipeline_id": {
+              "nullable": true,
+              "type": "integer"
+            },
+            "products": {
+              "items": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "picture": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number"
+                  },
+                  "quantity": {
+                    "type": "number"
+                  },
+                  "sku": {
+                    "type": "string"
+                  },
+                  "unit_type": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "source_id": {
+              "nullable": true,
+              "type": "integer"
+            },
+            "title": {
+              "nullable": true,
+              "type": "string"
+            },
+            "utm_campaign": {
+              "nullable": true,
+              "type": "string"
+            },
+            "utm_content": {
+              "nullable": true,
+              "type": "string"
+            },
+            "utm_medium": {
+              "nullable": true,
+              "type": "string"
+            },
+            "utm_source": {
+              "nullable": true,
+              "type": "string"
+            },
+            "utm_term": {
+              "nullable": true,
+              "type": "string"
+            }
+          },
+          "required": [
+            "contact"
+          ],
+          "type": "object"
+        }
+      }
+    }
+  },
+  "schemas": {}
+}
