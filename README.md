@@ -138,7 +138,7 @@ Two things the server cannot do for you. First, whatever a tool returns is sent 
 
 ## Limitations
 
-- **Not verified on a live account.** Requests are checked against the OpenAPI document, which describes shapes, not behaviour. Response handling and error texts are implemented from the documentation.
+- **Not verified on a live account.** Requests are checked against the OpenAPI document, which describes shapes, not behaviour. Response handling and error texts are implemented from the documentation. The [live check](#live-check) is there to find out; it has not been run on a real account yet.
 - **Filters come from the examples of the document.** KeyCRM declares `filter` as a free-form object and shows the available fields only in examples. The server offers exactly those fields. How each one matches (exact or partial, how a phone number has to be written) is not documented and has to be checked on a live account.
 - **A period needs both ends.** The filters are ranges (`created_between`, `updated_between`, `shipping_between`), so a tool wants a start and an end.
 - **The key is the whole account.** The document describes no scopes for an API key.
@@ -150,6 +150,26 @@ Two things the server cannot do for you. First, whatever a tool returns is sent 
 - **One account per server instance.**
 - **Fixed 30-second timeout** per request.
 
+## Live check
+
+Nobody has run this server on a live account yet (see the status at the top). `npm run live-check` is how to do it: it starts the built server the way an MCP host does and calls every read tool with every argument it has. The values for the filters (a status, a source, a phone, a period) come from the records your account already holds, so every filtered list has to bring back the record the values were taken from, and nothing that does not fit them. That is how the open questions of [Limitations](#limitations) get an answer: whether a phone is matched the way it is stored, whether the periods are really UTC. Each check prints one line, `PASS`, `FAIL` or `SKIP`, and the exit code is 1 when anything failed.
+
+```bash
+npm run live-check    # read tools only; nothing is created
+```
+
+The key is taken from `KEYCRM_API_KEY`; when that is not set, the script asks for it and the input is hidden. The key reaches the server through its environment, so it is neither in the command nor in the shell history, and the output is cleaned of it. The output holds counts and field names, not what your orders, buyers and cards hold. The exception is the list of pipelines with their ids and names, which the write check below needs.
+
+The run sends 19 requests, one less than KeyCRM allows per minute for one key, so wait a minute before running it again. When the limit is used up, the script stops and says so.
+
+**Creating a card is a separate run that you have to ask for:**
+
+```bash
+node scripts/live-check.mjs --create-card --pipeline-id 3
+```
+
+KeyCRM has no API operation that deletes a pipeline card: its OpenAPI document (version 1.2.0) deletes only a tag or an attachment. The card this run creates therefore stays in the pipeline until somebody deletes it by hand. That is why the pipeline has to be named, and why the script says so and waits for `yes` before it creates anything. The card is titled "MCP live check" with the date and "delete this card", has a made-up contact (`live-check@example.com`), no manager and no source. The script reads it back, checks that it is in the pipeline you named and looks it up by the time of its creation. The read checks are not part of this run; it needs a build, so run `npm run build` or `npm run live-check` before it.
+
 ## Development
 
 ```bash
@@ -157,11 +177,13 @@ npm install
 npm run lint          # tsc --noEmit over src/ and tests/
 npm test              # builds dist/ and the tests, then runs them with node:test
 npm run spec:update   # refreshes the OpenAPI snapshot from docs.keycrm.app
+npm run live-check    # runs every read tool against the real API (asks for a key)
 ```
 
 - `src/endpoints.ts` is the catalogue of API operations the server calls. `tests/spec.test.ts` compares it with `spec/keycrm-api.snapshot.json`, a reduced copy of the official OpenAPI document (parameters, request schemas, filter names and allowed `include` values of those operations only).
 - Every tool test calls the tool through a real MCP client. When a test ends, each request it recorded goes through `assertMatchesSpec`, which checks the path, query parameters, filters, headers and body against that snapshot.
 - `tests/e2e.test.ts` starts the built server as a child process over stdio against a local HTTP mock.
+- `scripts/live-check.mjs` is the [live check](#live-check). `tests/live-check.test.ts` runs it against a local stand-in for the API that keeps a small account, checks every request it causes against the snapshot, and covers the cases in which it has to fail, in which nothing may be created, and in which the key must not reach the output.
 - To poke at the server by hand: `npx @modelcontextprotocol/inspector node dist/index.js`.
 
 The server uses the official TypeScript SDK ([`@modelcontextprotocol/server`](https://www.npmjs.com/package/@modelcontextprotocol/server)) and `zod`; there are no other runtime dependencies.
